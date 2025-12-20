@@ -37,7 +37,7 @@ class AssistantController {
                 suggesting we don't have any dogs available.
                 """;
         this.ai = ai
-//                .defaultSystem(system)
+                .defaultSystem(system)
                 .build();
     }
 
