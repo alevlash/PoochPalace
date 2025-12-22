@@ -11,6 +11,14 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.ai.chat.client.advisor.PromptChatMemoryAdvisor;
+import org.springframework.ai.chat.client.advisor.vectorstore.QuestionAnswerAdvisor;
+import org.springframework.ai.chat.memory.InMemoryChatMemoryRepository;
+import org.springframework.ai.chat.memory.MessageWindowChatMemory;
+
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 @SpringBootApplication
 public class PoochPalaceApplication {
@@ -26,6 +34,7 @@ public class PoochPalaceApplication {
 class AssistantController {
 
     private final ChatClient ai;
+    private final Map<String, PromptChatMemoryAdvisor> memory = new ConcurrentHashMap<>();
 
     AssistantController(ChatClient.Builder ai
     ) {
@@ -42,11 +51,23 @@ class AssistantController {
     }
 
 
-    @GetMapping("/assistant")
-    String inquire (@RequestParam String question) {
+    @GetMapping("/{user}/assistant")
+    String inquire (@PathVariable String user, @RequestParam String question) {
+
+        var inMemoryChatMemoryRepository = new InMemoryChatMemoryRepository();
+        var chatMemory = MessageWindowChatMemory
+            .builder()
+            .chatMemoryRepository(inMemoryChatMemoryRepository)
+            .build();
+        var advisor = PromptChatMemoryAdvisor
+            .builder(chatMemory)
+            .build();
+        var advisorForUser = this.memory.computeIfAbsent(user, k -> advisor);
+
         return this.ai
                 .prompt()
                 .user(question)
+                .advisors(advisorForUser)
                 .call()
                 .content();
     }
