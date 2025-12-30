@@ -3,6 +3,7 @@ package com.example.poochpalace;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.data.repository.ListCrudRepository;
+import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.ResponseBody;
@@ -11,7 +12,10 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.ai.vectorstore.SimpleVectorStore;
+import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.ai.chat.client.advisor.PromptChatMemoryAdvisor;
+import org.springframework.context.annotation.Bean;
 import org.springframework.ai.chat.client.advisor.vectorstore.QuestionAnswerAdvisor;
 import org.springframework.ai.chat.memory.InMemoryChatMemoryRepository;
 import org.springframework.ai.chat.memory.MessageWindowChatMemory;
@@ -27,6 +31,11 @@ public class PoochPalaceApplication {
 		SpringApplication.run(PoochPalaceApplication.class, args);
 	}
 
+	@Bean
+	VectorStore vectorStore(EmbeddingModel embeddingModel) {
+		return SimpleVectorStore.builder(embeddingModel).build();
+	}
+
 }
 
 @Controller
@@ -36,7 +45,9 @@ class AssistantController {
     private final ChatClient ai;
     private final Map<String, PromptChatMemoryAdvisor> memory = new ConcurrentHashMap<>();
 
-    AssistantController(ChatClient.Builder ai
+    AssistantController(ChatClient.Builder ai,
+                        DogRepository repository,
+                        VectorStore vectorStore
     ) {
         var system = """
                 You are an AI powered assistant to help people adopt a dog from the adoption
@@ -72,3 +83,8 @@ class AssistantController {
                 .content();
     }
 }
+
+interface DogRepository extends ListCrudRepository<Dog, Integer> { }
+
+@Entity
+record Dog(@Id int id, String name, String owner, String description) { }
