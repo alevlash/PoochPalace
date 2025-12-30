@@ -53,7 +53,7 @@ class AssistantController {
 
     @GetMapping("/{user}/assistant")
     String inquire (@PathVariable String user, @RequestParam String question) {
-
+/* 
         var inMemoryChatMemoryRepository = new InMemoryChatMemoryRepository();
         var chatMemory = MessageWindowChatMemory
             .builder()
@@ -63,11 +63,11 @@ class AssistantController {
             .builder(chatMemory)
             .build();
         var advisorForUser = this.memory.computeIfAbsent(user, k -> advisor);
-
+*/
         return this.ai
                 .prompt()
                 .user(question)
-                .advisors(advisorForUser)
+//                .advisors(advisorForUser)
                 .call()
                 .content();
     }
