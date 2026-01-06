@@ -20,6 +20,7 @@ import org.springframework.ai.chat.client.advisor.vectorstore.QuestionAnswerAdvi
 import org.springframework.ai.chat.memory.InMemoryChatMemoryRepository;
 import org.springframework.ai.chat.memory.MessageWindowChatMemory;
 import org.springframework.ai.document.Document;
+import org.springframework.context.annotation.Lazy;
 
 import java.util.List;
 import java.util.Map;
@@ -41,11 +42,11 @@ public class PoochPalaceApplication {
 
 @Controller
 @ResponseBody
+@Lazy
 class AssistantController {
 
     private final ChatClient ai;
     private final Map<String, PromptChatMemoryAdvisor> memory = new ConcurrentHashMap<>();
-    private final VectorStore vectorStore;
 
     AssistantController(ChatClient.Builder ai,
                         DogRepository repository,
@@ -58,15 +59,21 @@ class AssistantController {
                 available will be presented below. If there is no information, then return a polite response 
                 suggesting we don't have any dogs available.
                 """;
-        this.ai = ai
-                .defaultSystem(system)
-                .build();
+
+
+        List<Dog> dogs = repository.findAll();
+            System.out.println("All dogs count: " + dogs.size());
 
         repository.findAll().forEach(dog -> {
             var dogument = new Document("id: %s, name: %s, description: %s".formatted(dog.getId(), dog.getName(), dog.getDescription()));
+            System.out.println("Adding dog to vector store: " + dogument);
             vectorStore.add(List.of(dogument));
         });
-        this.vectorStore = vectorStore;
+
+        this.ai = ai
+                .defaultSystem(system)
+                .defaultAdvisors(new QuestionAnswerAdvisor(vectorStore))
+                .build();
     }
 
 
@@ -87,7 +94,6 @@ class AssistantController {
                 .prompt()
                 .user(question)
                 .advisors(advisorForUser)
-                .advisors(new QuestionAnswerAdvisor(this.vectorStore))
                 .call()
                 .content();
     }
