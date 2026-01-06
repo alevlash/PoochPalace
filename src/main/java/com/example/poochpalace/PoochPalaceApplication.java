@@ -19,6 +19,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.ai.chat.client.advisor.vectorstore.QuestionAnswerAdvisor;
 import org.springframework.ai.chat.memory.InMemoryChatMemoryRepository;
 import org.springframework.ai.chat.memory.MessageWindowChatMemory;
+import org.springframework.ai.document.Document;
 
 import java.util.List;
 import java.util.Map;
@@ -44,6 +45,7 @@ class AssistantController {
 
     private final ChatClient ai;
     private final Map<String, PromptChatMemoryAdvisor> memory = new ConcurrentHashMap<>();
+    private final VectorStore vectorStore;
 
     AssistantController(ChatClient.Builder ai,
                         DogRepository repository,
@@ -59,12 +61,18 @@ class AssistantController {
         this.ai = ai
                 .defaultSystem(system)
                 .build();
+
+        repository.findAll().forEach(dog -> {
+            var dogument = new Document("id: %s, name: %s, description: %s".formatted(dog.getId(), dog.getName(), dog.getDescription()));
+            vectorStore.add(List.of(dogument));
+        });
+        this.vectorStore = vectorStore;
     }
 
 
     @GetMapping("/{user}/assistant")
     String inquire (@PathVariable String user, @RequestParam String question) {
-/* 
+ 
         var inMemoryChatMemoryRepository = new InMemoryChatMemoryRepository();
         var chatMemory = MessageWindowChatMemory
             .builder()
@@ -74,11 +82,12 @@ class AssistantController {
             .builder(chatMemory)
             .build();
         var advisorForUser = this.memory.computeIfAbsent(user, k -> advisor);
-*/
+
         return this.ai
                 .prompt()
                 .user(question)
-//                .advisors(advisorForUser)
+                .advisors(advisorForUser)
+                .advisors(new QuestionAnswerAdvisor(this.vectorStore))
                 .call()
                 .content();
     }

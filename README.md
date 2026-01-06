@@ -4,3 +4,7 @@ Set your OpenAI API key: export OPENAI_API_KEY=<your OpenAI API key>
 
 Build: ./mvnw clean install
 Run: ./mvnw spring-boot:run
+
+Links:
+Check health: http://localhost:8080/actuator/health
+Ask question: http://localhost:8080/jonathan/assistant?question="My name is John"
