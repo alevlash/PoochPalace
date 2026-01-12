@@ -86,7 +86,13 @@
            <artifactId>spring-ai-advisors-vector-store</artifactId>
            <version>1.0.1</version>
         </dependency>
-	</dependencies>
+	
+        <dependency>
+          <groupId>org.springframework.ai</groupId>
+          <artifactId>spring-ai-mcp</artifactId>
+          <version>1.0.0</version>
+        </dependency>
+ </dependencies>
 
 	<build>
 		<plugins>

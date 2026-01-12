@@ -6,9 +6,13 @@ import org.springframework.data.repository.ListCrudRepository;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 
-import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.ResponseBody;
+
+import io.modelcontextprotocol.client.McpClient;
+import io.modelcontextprotocol.client.McpSyncClient;
+import io.modelcontextprotocol.client.transport.HttpClientSseClientTransport;
+
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -16,8 +20,7 @@ import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.ai.vectorstore.SimpleVectorStore;
 import org.springframework.ai.embedding.EmbeddingModel;
-import org.springframework.ai.tool.annotation.Tool;
-import org.springframework.ai.tool.annotation.ToolParam;
+import org.springframework.ai.mcp.SyncMcpToolCallbackProvider;
 import org.springframework.ai.chat.client.advisor.PromptChatMemoryAdvisor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.ai.chat.client.advisor.vectorstore.QuestionAnswerAdvisor;
@@ -26,8 +29,6 @@ import org.springframework.ai.chat.memory.MessageWindowChatMemory;
 import org.springframework.ai.document.Document;
 import org.springframework.context.annotation.Lazy;
 
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -44,6 +45,17 @@ public class PoochPalaceApplication {
 		return SimpleVectorStore.builder(embeddingModel).build();
 	}
 
+    @Bean
+    McpSyncClient mcpSyncClient() {
+    var mcp = McpClient
+                .sync(HttpClientSseClientTransport
+                        .builder("http://localhost:8081")
+                                   .build())
+                    .build();
+        mcp.initialize();
+        return mcp;
+    }
+
 }
 
 @Controller
@@ -55,9 +67,9 @@ class AssistantController {
     private final Map<String, PromptChatMemoryAdvisor> memory = new ConcurrentHashMap<>();
 
     AssistantController(ChatClient.Builder ai,
+                        McpSyncClient mcpSyncClient,
                         DogRepository repository,
-                        VectorStore vectorStore,
-                        DogAdoptionScheduler dogAdoptionScheduler
+                        VectorStore vectorStore
     ) {
         var system = """
                 You are an AI powered assistant to help people adopt a dog from the adoption
@@ -79,8 +91,8 @@ class AssistantController {
 
         this.ai = ai
                 .defaultSystem(system)
-                .defaultTools(dogAdoptionScheduler)
                 .defaultAdvisors(new QuestionAnswerAdvisor(vectorStore))
+                .defaultToolCallbacks(new SyncMcpToolCallbackProvider(mcpSyncClient))
                 .build();
     }
 
@@ -105,6 +117,7 @@ class AssistantController {
                 .call()
                 .content();
     }
+
 }
 
 interface DogRepository extends ListCrudRepository<Dog, Integer> { }
@@ -170,18 +183,3 @@ class Dog {
     }
 }
 
-@Component
-class DogAdoptionScheduler {
-
-    @Tool(description = "schedule an appointment to pickup or "+ 
-                        "adopt a dog from a Pooch Palace location")
-    String scheduleAdoption(
-            @ToolParam(description = "the id of the dog") int dogId,
-            @ToolParam(description = "the name of the dog") String dogName) {
-        System.out.println("scheduleAdoption: " + dogId + " " + dogName + ".");
-        return Instant
-                .now()
-                .plus(3, ChronoUnit.DAYS)
-                .toString();
-    }
-}
